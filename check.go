@@ -22,6 +22,7 @@ type Check struct {
 	results      []Result
 	perfdata     []PerfDatum
 	status       Status
+	debuglines   string
 	statusPolicy *statusPolicy
 }
 
@@ -96,13 +97,17 @@ func (c *Check) AddResultf(status Status, format string, v ...interface{}) {
 // infinity.
 //
 // Returns error on invalid parameters.
-func (c *Check) AddPerfDatum(label, unit string, value float64, thresholds ...float64) error {
-	datum, err := NewPerfDatum(label, unit, value, thresholds...)
+func (c *Check) AddPerfDatum(label, unit string, value float64, warn, crit string, thresholds ...float64) error {
+	datum, err := NewPerfDatum(label, unit, value, warn, crit, thresholds...)
 	if err != nil {
 		return err
 	}
 	c.perfdata = append(c.perfdata, *datum)
 	return nil
+}
+
+func (c *Check) AddDebugLine(debugline string) {
+	c.debuglines += debugline + "\n"
 }
 
 // exitInfoText returns the most important result text, formatted for
@@ -120,11 +125,19 @@ func (c Check) exitInfoText() string {
 	return strings.Join(importantMessages, messageSeparator)
 }
 
+func (c Check) renderDebugLine() string {
+	return strings.ReplaceAll(strings.TrimSpace(c.debuglines), "|", "")
+}
+
 // String representation of the check results, suitable for output and
 // parsing by Nagios.
 func (c Check) String() string {
 	value := fmt.Sprintf("%v: %s", c.status, c.exitInfoText())
 	value += RenderPerfdata(c.perfdata)
+	debuglines := c.renderDebugLine()
+	if debuglines != "" {
+		value += "\n" + c.renderDebugLine()
+	}
 	return value
 }
 

@@ -15,8 +15,8 @@ type PerfDatum struct {
 	unit  string
 	min   *float64
 	max   *float64
-	warn  *float64
-	crit  *float64
+	warn  string
+	crit  string
 }
 
 // fmtPerfFloat returns a string representation of n formatted in the
@@ -44,7 +44,7 @@ func validUnit(unit string) bool {
 // Zero to four thresholds may be supplied: min, max, warn and crit.
 // Thresholds may be positive infinity, negative infinity, or NaN, in
 // which case they will be omitted in check output.
-func NewPerfDatum(label string, unit string, value float64, thresholds ...float64) (*PerfDatum, error) {
+func NewPerfDatum(label string, unit string, value float64, warn, crit string, thresholds ...float64) (*PerfDatum, error) {
 	datum := new(PerfDatum)
 	datum.label = label
 	datum.value = value
@@ -61,12 +61,14 @@ func NewPerfDatum(label string, unit string, value float64, thresholds ...float6
 	if len(thresholds) >= 2 {
 		datum.max = &thresholds[1]
 	}
-	if len(thresholds) >= 3 {
-		datum.warn = &thresholds[2]
+	if _, err := ParseRange(warn); err != nil {
+		return nil, fmt.Errorf("warn range is not valid: %s", err.Error())
 	}
-	if len(thresholds) >= 4 {
-		datum.crit = &thresholds[3]
+	datum.warn = warn
+	if _, err := ParseRange(crit); err != nil {
+		return nil, fmt.Errorf("crit range is not valid: %s", err.Error())
 	}
+	datum.crit = crit
 	return datum, nil
 }
 
@@ -98,8 +100,7 @@ func fmtThreshold(t *float64) string {
 // check output.
 func (p PerfDatum) String() string {
 	val := fmtPerfFloat(p.value)
-	value := fmt.Sprintf("%s=%s%s", p.label, val, p.unit)
-	value += fmt.Sprintf(";%s;%s", fmtThreshold(p.warn), fmtThreshold(p.crit))
+	value := fmt.Sprintf("%s=%s%s;%s;%s", p.label, val, p.unit, p.warn, p.crit)
 	value += fmt.Sprintf(";%s;%s", fmtThreshold(p.min), fmtThreshold(p.max))
 	return value
 }
